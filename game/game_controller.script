@@ -1,0 +1,63 @@
+
+local function load_level (self, level_to_load)
+	if self.current_level ~= nil then
+		msg.post(self.current_level, "unload")
+	end
+
+	-- convert 'level_to_load' into a local url
+	local level_url = msg.url(nil, nil, level_to_load)
+
+	self.current_level = level_url
+
+	msg.post(self.current_level, "load")
+end
+
+-- called when we want to reload the current collection proxy
+local function reload_level (self)
+	self.reloading_level = true
+	msg.post(self.current_level, "disable")
+	msg.post(self.current_level, "final")
+	msg.post(self.current_level, "unload")
+end
+
+function init(self)
+	-- used to keep track of our current collection proxy
+	self.current_level = nil
+
+	-- reloading_level is used to flag whether or not the current
+	-- proxy unload should reload the current_level or not
+	-- this gets set to false whenever a new level is loaded in
+	self.reloading_level = false
+
+	msg.post(".", "acquire_input_focus")
+
+	-- load in our first collection
+	load_level(self, "menu")
+end
+
+function on_message(self, message_id, message, sender)
+	-- sent when we want to load a new level
+	-- play from menu, hit end flag
+	if message_id == hash("load_level") then
+		load_level(self, message.level)
+		
+	-- sent when we want to reload the current level
+	-- hit enemy, fall off level
+	elseif message_id == hash("reload_level") then
+		reload_level(self)
+		
+	-- sent when a collection had finished loading in
+	elseif message_id == hash("proxy_loaded") then
+		self.reloading_level = false
+		msg.post(sender, "init")
+		msg.post(sender, "enable")
+		
+	-- sent when a collection had finished unloading
+	elseif message_id == hash("proxy_unloaded") then
+		if self.reloading_level == true then
+			msg.post(self.current_level, "load")
+		end
+	end
+end
+
+
